@@ -13,16 +13,14 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends portaudio19-dev build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
-RUN pip install --upgrade pip && \
-    pip install poetry
+# Upgrade pip
+RUN pip install --upgrade pip
 
-# Copy only the necessary files to leverage Docker cache
-COPY pyproject.toml poetry.lock ./
+# Copy dependency files
+COPY requirements.txt ./
 
 # Install Python dependencies
-RUN poetry config virtualenvs.create false && \
-    poetry install --no-dev --no-interaction --no-ansi
+RUN pip install -r requirements.txt
 
 # Copy the rest of the application code
 COPY . .
@@ -30,5 +28,5 @@ COPY . .
 # Expose the port your app runs on
 EXPOSE 5000
 
-# Define the default command to run the application
+# Define the default command to run your app using Gunicorn
 CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000"]
