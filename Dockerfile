@@ -8,19 +8,21 @@ ENV PYTHONUNBUFFERED=1
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including ffmpeg
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends portaudio19-dev build-essential && \
+    apt-get install -y --no-install-recommends portaudio19-dev build-essential ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip
-RUN pip install --upgrade pip
+# Install Poetry
+RUN pip install --upgrade pip && \
+    pip install poetry
 
-# Copy dependency files
-COPY requirements.txt ./
+# Copy dependency files to leverage Docker cache
+COPY pyproject.toml poetry.lock ./
 
 # Install Python dependencies
-RUN pip install -r requirements.txt
+RUN poetry config virtualenvs.create false && \
+    poetry install --no-dev --no-interaction --no-ansi
 
 # Copy the rest of the application code
 COPY . .
@@ -28,5 +30,5 @@ COPY . .
 # Expose the port your app runs on
 EXPOSE 5000
 
-# Define the default command to run your app using Gunicorn
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000"]
+# Define the default command to run your app using Gunicorn with optimized settings
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers", "2", "--preload"]
