@@ -1,0 +1,11 @@
+Flask
+openai-whisper
+sounddevice
+soundfile
+numpy
+Werkzeug
+PyPDF2
+openai
+librosa
+scipy
+scikit-learn
