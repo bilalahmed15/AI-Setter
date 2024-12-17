@@ -29,4 +29,10 @@ COPY . .
 EXPOSE 5000
 
 # Define the default command to run the application using Gunicorn
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers", "2", "--preload"]
+CMD ["gunicorn", "app:app", \
+     "--bind", "0.0.0.0:5000", \
+     "--timeout", "120", \
+     "--workers", "3", \
+     "--threads", "3", \
+     "--worker-connections", "1000", \
+     "--preload"]
