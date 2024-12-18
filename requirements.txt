@@ -1,5 +1,4 @@
 Flask
-gunicorn
 openai-whisper
 sounddevice
 soundfile

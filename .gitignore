@@ -1,0 +1,7 @@
+.vercel
+__pycache__/
+*.pyc
+uploads/
+venv/
+.env
+voice_training/
