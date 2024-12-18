@@ -12,7 +12,7 @@ WORKDIR /app
 
 # Install system dependencies including ffmpeg
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg portaudio19-dev build-essential && \
+    apt-get install -y --no-install-recommends ffmpeg portaudio19-dev build-essential cuda-toolkit-11-8 && \
     rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip
@@ -30,5 +30,18 @@ COPY . .
 # Expose the port the app runs on
 EXPOSE 5000
 
-# Define the default command to run the application using Gunicorn with increased timeout
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "300", "--preload"]
+# Define the command with optimized workers and threads
+CMD ["gunicorn", "app:app", \
+     "--bind", "0.0.0.0:5000", \
+     "--workers", "2", \
+     "--threads", "4", \
+     "--worker-class", "gthread", \
+     "--timeout", "300", \
+     "--keepalive", "5", \
+     "--max-requests", "1000", \
+     "--max-requests-jitter", "50", \
+     "--preload"]
+
+# Add environment variables for PyTorch to use CUDA
+ENV CUDA_VISIBLE_DEVICES=0
+ENV TORCH_CUDA_ARCH_LIST="7.5"
