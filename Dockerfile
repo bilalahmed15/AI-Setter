@@ -1,36 +1,40 @@
-# Use an official Python runtime as the base image
+# Use CUDA-enabled Python image
 FROM python:3.11-slim
 
-# Set environment variables to prevent Python from writing pyc files and buffer outputs
+# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV MALLOC_TRIM_THRESHOLD_=100000
 ENV MALLOC_MMAP_THRESHOLD_=100000
 
-# Set the working directory in the container
+# Set the working directory
 WORKDIR /app
 
-# Install system dependencies including ffmpeg
+# Install system dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg portaudio19-dev build-essential cuda-toolkit-11-8 && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends \
+    ffmpeg \
+    portaudio19-dev \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip
+# Since we're running on CPU, optimize for that
+ENV OMP_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
+ENV NUMEXPR_NUM_THREADS=1
+
+# Upgrade pip and install requirements
 RUN pip install --upgrade pip
-
-# Copy the requirements.txt file into the container
 COPY requirements.txt .
-
-# Install Python dependencies
 RUN pip install -r requirements.txt
 
-# Copy the rest of the application code into the container
+# Copy the application
 COPY . .
 
-# Expose the port the app runs on
+# Expose port
 EXPOSE 5000
 
-# Define the command with optimized workers and threads
+# Configure Gunicorn
 CMD ["gunicorn", "app:app", \
      "--bind", "0.0.0.0:5000", \
      "--workers", "2", \
@@ -41,7 +45,3 @@ CMD ["gunicorn", "app:app", \
      "--max-requests", "1000", \
      "--max-requests-jitter", "50", \
      "--preload"]
-
-# Add environment variables for PyTorch to use CUDA
-ENV CUDA_VISIBLE_DEVICES=0
-ENV TORCH_CUDA_ARCH_LIST="7.5"
