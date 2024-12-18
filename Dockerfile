@@ -35,13 +35,4 @@ COPY . .
 EXPOSE 5000
 
 # Configure Gunicorn
-CMD ["gunicorn", "app:app", \
-     "--bind", "0.0.0.0:5000", \
-     "--workers", "2", \
-     "--threads", "4", \
-     "--worker-class", "gthread", \
-     "--timeout", "300", \
-     "--keepalive", "5", \
-     "--max-requests", "1000", \
-     "--max-requests-jitter", "50", \
-     "--preload"]
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "300", "--preload"]
