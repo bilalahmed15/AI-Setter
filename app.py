@@ -45,7 +45,7 @@ is_training = False
 TRAINING_DURATION = 10  # seconds for voice training
 
 # Initialize the OpenAI client
-client = OpenAI(api_key='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')  # Replace with your API key
+client = OpenAI(api_key=' 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')  # Replace with your API key
 
 # Global variables for document storage
 document_context = []
@@ -213,7 +213,7 @@ class SpeakerDiarizer:
             print(f"Voice similarity score: {similarity_score}")  # Debug print
             
             # Return "Me" for trained voice, "Client" for others
-            if similarity_score > 0.77:
+            if similarity_score > 0.75:
                 return "Me"
             else:
                 return "Client"
