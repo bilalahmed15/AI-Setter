@@ -575,7 +575,7 @@
                 const seconds = recordingTime % 60;
                 recordingTimer.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
                 
-                if (recordingTime >= 10) { // 10 seconds maximum
+                if (recordingTime >= 600) { // 10 minutes (600 seconds) maximum
                     stopRecording();
                 }
             }, 1000);
