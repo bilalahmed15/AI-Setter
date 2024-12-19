@@ -38,21 +38,3 @@ jobs:
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-      - name: Deploy to App Runner
-        uses: awslabs/amazon-app-runner-deploy@main
-        with:
-          service: whisper-transcription-service
-          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
-          access-role-arn: ${{ secrets.APPRUNNER_SERVICE_ROLE_ARN }}
-          region: ${{ env.AWS_REGION }}
-          cpu: 2
-          memory: 4096
-          port: 5000
-          wait-for-service-stability: true
-          environment-variables: |
-            MALLOC_TRIM_THRESHOLD_=100000
-            MALLOC_MMAP_THRESHOLD_=100000
-            OMP_NUM_THREADS=1
-            MKL_NUM_THREADS=1
-            NUMEXPR_NUM_THREADS=1 
