@@ -842,5 +842,9 @@ def clear_document_context():
     document_context = []
     return jsonify({'success': True, 'message': 'Document context cleared'})
 
+def health_check(request):
+    return HttpResponse('OK', status=200)
+
+
 if __name__ == '__main__':
     app.run(debug=False, threaded=True)
