@@ -842,8 +842,26 @@ def clear_document_context():
     document_context = []
     return jsonify({'success': True, 'message': 'Document context cleared'})
 
-def health_check(request):
-    return HttpResponse('OK', status=200)
+@app.route('/health', methods=['GET'])
+def health_check():
+    """
+    Health check endpoint for AWS App Runner and monitoring services.
+    Returns:
+        JSON response with status and timestamp
+    """
+    try:
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'service': 'whisper-transcription',
+            'version': '1.0.0'  # You can update this based on your versioning
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
 
 
 if __name__ == '__main__':
