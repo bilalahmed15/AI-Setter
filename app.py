@@ -850,18 +850,9 @@ def health_check():
         JSON response with status and timestamp
     """
     try:
-        return jsonify({
-            'status': 'healthy',
-            'timestamp': datetime.now().isoformat(),
-            'service': 'whisper-transcription',
-            'version': '1.0.0'  # You can update this based on your versioning
-        }), 200
+        return '', 200
     except Exception as e:
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e),
-            'timestamp': datetime.now().isoformat()
-        }), 500
+       '', 500
 
 
 if __name__ == '__main__':
