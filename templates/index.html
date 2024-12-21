@@ -488,30 +488,6 @@
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', initializeMicrophone);
 
-        function checkTranscription() {
-            if (isPaused) return;
-
-            fetch('/get_transcription')
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Received transcription data:', data);
-                    
-                    if (data.success && data.transcription) {
-                        const emptyState = transcriptionDiv.querySelector('.empty-state');
-                        if (emptyState) {
-                            emptyState.remove();
-                        }
-                        
-                        const transcriptionEntry = createTranscriptionEntry(data);
-                        transcriptionDiv.insertBefore(transcriptionEntry, transcriptionDiv.firstChild);
-                        transcriptionEntry.scrollIntoView({ behavior: 'smooth' });
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching transcription:', error);
-                });
-        }
-
         function createTranscriptionEntry(data) {
             console.log('Creating entry with data:', data);
             
@@ -545,6 +521,33 @@
             
             return transcriptionEntry;
         }
+
+        function checkTranscription() {
+            if (isPaused) return;
+
+            fetch('/get_transcription')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Received transcription data:', data);
+                    
+                    if (data.success && data.transcription) {
+                        const emptyState = transcriptionDiv.querySelector('.empty-state');
+                        if (emptyState) {
+                            emptyState.remove();
+                        }
+                        
+                        const transcriptionEntry = createTranscriptionEntry(data);
+                        transcriptionDiv.insertBefore(transcriptionEntry, transcriptionDiv.firstChild);
+                        transcriptionEntry.scrollIntoView({ behavior: 'smooth' });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching transcription:', error);
+                });
+        }
+
+        // Start the transcription checking
+        setInterval(checkTranscription, 300);
 
         async function generateAIResponse(transcription) {
             try {
