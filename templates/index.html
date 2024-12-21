@@ -396,25 +396,49 @@
 
         .error-message {
             margin: 20px 0;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         .error-message .alert {
+            border-left: 4px solid #e53e3e;
+            background: #fff5f5;
+            padding: 20px;
             border-radius: 8px;
-            padding: 15px 20px;
         }
 
         .error-message i {
-            margin-right: 8px;
+            color: #e53e3e;
+            margin-right: 10px;
         }
 
-        .error-message ul {
-            margin-top: 10px;
-            margin-bottom: 0;
+        .error-details {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #edf2f7;
+        }
+
+        .error-details h4 {
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+
+        .error-details ol {
+            margin: 10px 0;
             padding-left: 20px;
         }
 
-        .error-message li {
-            margin-bottom: 5px;
+        .error-details li {
+            margin-bottom: 8px;
+            color: #4a5568;
+        }
+
+        .error-details p {
+            margin-top: 15px;
+            color: #718096;
+            font-style: italic;
         }
     </style>
 </head>
@@ -470,41 +494,60 @@
     </div>
 
     <script>
-        async function checkMicrophoneAccess() {
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Check if we're in a secure context (HTTPS)
+            if (!window.isSecureContext) {
+                showError('This application requires a secure connection (HTTPS) to access the microphone. Please ensure you\'re using HTTPS.');
+                return;
+            }
+
+            // Check if browser supports getUserMedia
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showError('Your browser doesn\'t support microphone access. Please use a modern browser like Chrome, Firefox, or Safari.');
+                return;
+            }
+
             try {
                 // Request microphone permission
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                stream.getTracks().forEach(track => track.stop()); // Clean up
-                return true;
-            } catch (err) {
-                console.error('Microphone access error:', err);
-                return false;
-            }
-        }
-
-        document.addEventListener('DOMContentLoaded', async function() {
-            try {
-                const hasMicrophone = await checkMicrophoneAccess();
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: true,
+                    video: false
+                });
                 
-                if (!hasMicrophone) {
-                    throw new Error('No microphone access. Please ensure your browser has microphone permissions enabled.');
-                }
-
-                // Initialize MediaRecorder only if microphone is available
-                navigator.mediaDevices.getUserMedia({ audio: true })
-                    .then(stream => {
-                        mediaRecorder = new MediaRecorder(stream);
-                        setupMediaRecorder();
-                    })
-                    .catch(err => {
-                        console.error('Error accessing microphone:', err);
-                        showError('Unable to access microphone. Please check your permissions and device settings.');
-                    });
+                // Stop the stream immediately after testing
+                stream.getTracks().forEach(track => track.stop());
+                
+                // Initialize MediaRecorder
+                setupAudioRecording();
+                
             } catch (error) {
-                console.error('Initialization error:', error);
-                showError(error.message);
+                console.error('Microphone access error:', error);
+                let errorMessage = 'Unable to access microphone. ';
+                
+                if (error.name === 'NotAllowedError') {
+                    errorMessage += 'Please allow microphone access in your browser settings.';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage += 'No microphone device found. Please connect a microphone.';
+                } else {
+                    errorMessage += 'Please check your device settings and browser permissions.';
+                }
+                
+                showError(errorMessage);
             }
         });
+
+        function setupAudioRecording() {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    mediaRecorder = new MediaRecorder(stream);
+                    setupMediaRecorder();
+                    updateStatus('Ready to record');
+                })
+                .catch(error => {
+                    console.error('Setup error:', error);
+                    showError('Error setting up audio recording: ' + error.message);
+                });
+        }
 
         function showError(message) {
             const errorDiv = document.createElement('div');
@@ -513,20 +556,29 @@
                 <div class="alert alert-danger" role="alert">
                     <i class="fas fa-exclamation-circle"></i>
                     ${message}
-                    <br>
-                    <small>Please ensure:
-                        <ul>
-                            <li>Your device has a working microphone</li>
-                            <li>You've granted microphone permissions to this site</li>
-                            <li>No other application is using the microphone</li>
-                        </ul>
-                    </small>
+                    <div class="error-details">
+                        <h4>Troubleshooting Steps:</h4>
+                        <ol>
+                            <li>Ensure you're using HTTPS</li>
+                            <li>Check if your microphone is properly connected</li>
+                            <li>Allow microphone access when prompted</li>
+                            <li>Check browser settings for microphone permissions</li>
+                            <li>Try refreshing the page</li>
+                        </ol>
+                        <p>If problems persist, try using a different browser or device.</p>
+                    </div>
                 </div>
             `;
             
-            // Insert at the top of the content area
             const container = document.querySelector('.container');
             container.insertBefore(errorDiv, container.firstChild);
+        }
+
+        function updateStatus(message) {
+            const statusBar = document.querySelector('.status-bar');
+            if (statusBar) {
+                statusBar.innerHTML = `<i class="fas fa-circle"></i> ${message}`;
+            }
         }
 
         const transcriptionDiv = document.getElementById('transcription');
