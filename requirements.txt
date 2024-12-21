@@ -4,6 +4,7 @@ openai-whisper
 sounddevice
 soundfile
 numpy
+flask-cors
 Werkzeug
 PyPDF2
 openai
