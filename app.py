@@ -11,15 +11,27 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 from PyPDF2 import PdfReader
 from openai import OpenAI
+import openai
 import librosa
 from scipy.io import wavfile
 from sklearn.preprocessing import StandardScaler
 import io
 from scipy.signal import find_peaks
 from scipy import stats
+from flask_cors import CORS
 
 # Initialize Flask app
 app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "*"}})
+
+# Initialize Whisper model at startup
+print("Loading Whisper model...")
+try:
+    app.whisper_model = whisper.load_model("base")
+    print("Whisper model loaded successfully")
+except Exception as e:
+    print(f"Error loading Whisper model: {e}")
+    app.whisper_model = None
 
 # Configure upload folder
 UPLOAD_FOLDER = 'uploads'
@@ -45,7 +57,7 @@ is_training = False
 TRAINING_DURATION = 10  # seconds for voice training
 
 # Initialize the OpenAI client
-client = OpenAI(api_key=' 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')  # Replace with your API key
+openai.api_key = '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'  # Replace with your API key
 
 # Global variables for document storage
 document_context = []
@@ -435,47 +447,58 @@ def audio_callback(indata, frames, time, status):
 
 def get_ai_response(transcription):
     try:
-        # Prepare document context string
-        context_docs = ""
-        for doc in document_context:
-            context_docs += f"\nDocument: {doc['source']}\nContent: {doc['content']}\n"
-        
         print(f"Generating AI response for: {transcription}")
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo-16k",  # Using 16k model for longer context
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo-16k",
             messages=[
                 {
                     "role": "system",
-                    "content": f"""You are Alex, a senior SaaS solutions consultant. You specialize in helping clients find the right solutions to their business challenges. When responding:
+                    "content": f"""You are Alex, a senior SaaS solutions consultant with expertise in helping businesses optimize their operations through software solutions. You are authorized to discuss only the following domains:
 
-1. ALWAYS stay focused on the client's specific question
-2. If you don't have relevant information in the reference documents, say: "Let me address your specific question about [topic]..." and provide general best practices
-3. If you have relevant information in the reference documents, say: "Based on our solution capabilities..." and reference specific features
+Authorized Discussion Areas:
+1. Business process optimization through our SaaS solutions
+2. Implementation strategies for our documented features
+3. Integration capabilities within our ecosystem
+4. ROI and business value of our solutions
+5. Best practices for deploying our SaaS tools
 
-Your response structure:
-1. Brief acknowledgment of their specific need
-2. Your proposed solution with clear examples
-3. Quick summary of benefits
-4. Clear next steps
+Core Responsibilities:
+1. Address client questions about business process optimization
+2. When discussing solutions:
+   - For documented features: Say "Based on our solution capabilities..." and reference specific features
+   - For business challenges: Say "Let me address your needs regarding [business area]..." and provide strategic recommendations
+   - For out-of-scope queries: Say "While I specialize in [our solution areas], that specific topic is outside my expertise. Let me focus on how our solutions can help with..."
 
-Remember to:
-- Use natural language ("I understand what you're looking for...")
-- Stay focused on their exact question
-- Only mention features we actually have
-- Be honest about capabilities
-- Keep responses concise and relevant
+Your Response Structure:
+1. Acknowledge business context: "I understand your organization is looking to [specific business need]..."
+2. Present solution strategy:
+   - Connect business needs to specific features
+   - Provide implementation examples
+   - Highlight integration possibilities
+3. Demonstrate business value:
+   - Efficiency gains
+   - Cost benefits
+   - Operational improvements
+4. Recommend clear next steps
 
-Reference Materials:
+Communication Guidelines:
+- Use business-focused language
+- Provide practical, actionable insights
+- Reference relevant case applications
+- Keep responses strategic and value-oriented
+- Only discuss solutions and features documented in our materials
+
+Available Solutions:
 {context_docs}
 
-Important: Never suggest solutions or products we don't offer. If unsure, focus on understanding their needs better."""
+Expert Focus: Provide strategic SaaS solutions that align with client's business objectives and operational needs, strictly within our documented capabilities."""
                 },
                 {"role": "user", "content": transcription}
             ],
-            max_tokens=500,  # Increased token limit for more detailed responses
+            max_tokens=500,
             temperature=0.7
         )
-        ai_response = response.choices[0].message.content
+        ai_response = response.choices[0].message['content']
         print(f"AI Response generated: {ai_response}")
         return ai_response
     except Exception as e:
@@ -582,6 +605,11 @@ def index():
 @app.route('/get_transcription')
 def get_transcription():
     try:
+        # Check if Whisper model is loaded
+        if not hasattr(app, 'whisper_model') or app.whisper_model is None:
+            print("Loading Whisper model...")
+            app.whisper_model = whisper.load_model("base")
+            
         if not transcription_queue.empty():
             data = transcription_queue.get_nowait()
             print(f"Sending transcription: {data}")  # Debug log
@@ -841,6 +869,18 @@ def clear_document_context():
     global document_context
     document_context = []
     return jsonify({'success': True, 'message': 'Document context cleared'})
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """
+    Health check endpoint for AWS App Runner and monitoring services.
+    Returns:
+        JSON response with status and timestamp
+    """
+    try:
+        return '', 200
+    except Exception as e:
+       '', 500
 
 if __name__ == '__main__':
     app.run(debug=False, threaded=True)

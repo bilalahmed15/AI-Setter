@@ -13,14 +13,15 @@
         }
 
         .container {
-            max-width: 1000px;
-            margin: 40px auto;
-            padding: 20px;
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 20px 40px;
         }
 
         .header {
             text-align: center;
-            margin-bottom: 40px;
+            margin-bottom: 20px;
+            padding: 20px 0;
         }
 
         .header h1 {
@@ -42,7 +43,10 @@
             text-align: center;
             transition: all 0.3s ease;
             border: 2px dashed #e2e8f0;
-            margin-bottom: 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
 
         .upload-area.drag-over {
@@ -76,11 +80,9 @@
         }
 
         .transcription-container {
-            background: white;
-            border-radius: 16px;
-            padding: 30px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-            margin-top: 30px;
+            flex: 1;
+            margin-top: 20px;
+            overflow-y: auto;
         }
 
         .transcription-item {
@@ -146,27 +148,40 @@
         }
 
         .continue-section {
-            margin-top: 30px;
-            text-align: center;
+            margin: 0 0 20px;
             padding: 20px;
             background: #ebf8ff;
             border-radius: 12px;
+            border-left: 4px solid #4299e1;
+            text-align: center;
+        }
+
+        .continue-section h3 {
+            color: #2d3748;
+            margin-top: 0;
+            margin-bottom: 15px;
         }
 
         .continue-button {
             display: inline-block;
-            padding: 14px 28px;
+            padding: 14px 24px;
             background: #4299e1;
             color: white;
             text-decoration: none;
             border-radius: 8px;
             font-weight: 500;
             transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .continue-button:hover {
             background: #3182ce;
             transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        .continue-button i {
+            margin-right: 8px;
         }
 
         @keyframes spin {
@@ -175,10 +190,13 @@
         }
 
         .voice-training-section {
+            flex: 1;
+            margin: 0;
+            height: auto;
             background: white;
             border-radius: 16px;
             padding: 30px;
-            margin: 30px 0;
+            margin: 0;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
             text-align: center;
         }
@@ -221,7 +239,8 @@
 
         .quick-start {
             text-align: center;
-            margin-bottom: 30px;
+            margin: 0 0 20px;
+            padding: 10px 0;
         }
 
         .start-button {
@@ -284,6 +303,77 @@
         .file-item .status.error {
             color: #e53e3e;
         }
+
+        .voice-training-instructions {
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 25px 30px;
+            margin-bottom: 20px;
+            border-left: 4px solid #4299e1;
+            flex-shrink: 0;
+        }
+
+        .voice-training-instructions h3 {
+            color: #2d3748;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+
+        .voice-training-instructions ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .voice-training-instructions li {
+            color: #4a5568;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .voice-training-instructions li:last-child {
+            margin-bottom: 0;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            min-height: calc(100vh - 200px);
+            padding: 0 15px;
+        }
+
+        .column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 100%;
+        }
+
+        .voice-column {
+            padding-right: 15px;
+        }
+
+        .upload-column {
+            padding-left: 15px;
+        }
+
+        /* Responsive design */
+        @media (max-width: 968px) {
+            .container {
+                padding: 10px 20px;
+            }
+
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+                min-height: auto;
+            }
+
+            .voice-column, 
+            .upload-column {
+                padding: 0;
+            }
+        }
     </style>
 </head>
 <body>
@@ -293,56 +383,75 @@
             <p>Upload your documents and get instant transcriptions</p>
         </div>
 
-        <div class="upload-area" id="dropZone">
-            <div class="upload-icon">📄</div>
-            <h2>Drag & Drop Files Here</h2>
-            <p>or</p>
-            <label class="upload-button">
-                Choose Files
-                <input type="file" class="file-input" id="fileInput" multiple accept=".pdf,.mp3,.mp4,.wav">
-            </label>
-            <p class="supported-files">Supported formats: PDF, MP3, MP4, WAV</p>
-        </div>
+        <div class="main-content">
+            <!-- Left Column -->
+            <div class="column voice-column">
+                <div id="continueSection" class="continue-section" style="display: none;">
+                    <h3>Voice training completed!</h3>
+                    <a href="/index" class="continue-button">
+                        <i class="fas fa-play"></i>
+                        Continue to Live Meeting Notes
+                    </a>
+                </div>
 
-        <div class="voice-training-section" id="voiceTrainingSection">
-            <h2>Train AI with Your Voice</h2>
-            <p>Record or upload your voice to help AI recognize you as Speaker 1</p>
-            
-            <div class="training-options">
-                <div class="training-option">
-                    <h3>Record Your Voice</h3>
-                    <button id="startRecording" class="training-button">
-                        <i class="fas fa-microphone"></i> Start Recording
-                    </button>
-                    <div id="recordingStatus" style="display: none;">
-                        Recording... <span id="recordingTimer">0:00</span>
+                <div class="voice-training-instructions">
+                    <h3>Voice Training Instructions</h3>
+                    <ol>
+                        <li>Please ensure you provide high-quality voice recordings with minimal background noise for optimal training results.</li>
+                        <li>Record a minimum of 2 minutes of continuous speech using the voice recorder below. This helps the AI better understand your voice patterns.</li>
+                        <li>After uploading or recording, please wait for the processing confirmation. A notification will appear once all files have been successfully processed.</li>
+                    </ol>
+                </div>
+
+                <div class="voice-training-section" id="voiceTrainingSection">
+                    <h2>Train AI with Your Voice</h2>
+                    <p>Record or upload your voice to help AI recognize you as Speaker 1</p>
+                    <div class="training-options">
+                        <div class="training-option">
+                            <h3>Record Your Voice</h3>
+                            <button id="startRecording" class="training-button">
+                                <i class="fas fa-microphone"></i> Start Recording
+                            </button>
+                            <div id="recordingStatus" style="display: none;">
+                                Recording... <span id="recordingTimer">0:00</span>
+                            </div>
+                        </div>
+                        
+                        <div class="training-option">
+                            <h3>Upload Voice Samples</h3>
+                            <label class="training-button">
+                                <i class="fas fa-upload"></i> Upload Voice Files
+                                <input type="file" id="voiceFileInput" accept=".wav,.mp3" multiple style="display: none;">
+                            </label>
+                            <div id="uploadedFiles" class="uploaded-files"></div>
+                        </div>
+                    </div>
+                    
+                    <div id="trainingStatus" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Training AI with your voice...</p>
                     </div>
                 </div>
-                
-                <div class="training-option">
-                    <h3>Upload Voice Samples</h3>
-                    <label class="training-button">
-                        <i class="fas fa-upload"></i> Upload Voice Files
-                        <input type="file" id="voiceFileInput" accept=".wav,.mp3" multiple style="display: none;">
+            </div>
+
+            <!-- Right Column -->
+            <div class="column upload-column">
+                <div class="upload-area" id="dropZone">
+                    <div class="upload-icon">📄</div>
+                    <h2>Drag & Drop Files Here</h2>
+                    <p>or</p>
+                    <label class="upload-button">
+                        Choose Files
+                        <input type="file" class="file-input" id="fileInput" multiple accept=".pdf,.mp3,.mp4,.wav">
                     </label>
-                    <div id="uploadedFiles" class="uploaded-files"></div>
+                    <p class="supported-files">Supported formats: PDF, MP3, MP4, WAV</p>
+                </div>
+
+                <div id="transcriptionResults" class="transcription-container" style="display: none;">
+                    <h2>Transcriptions</h2>
+                    <div class="transcription-list"></div>
                 </div>
             </div>
-            
-            <div id="trainingStatus" style="display: none;">
-                <div class="spinner"></div>
-                <p>Training AI with your voice...</p>
-            </div>
-        </div>
-
-        <div id="transcriptionResults" class="transcription-container" style="display: none;">
-            <h2>Transcriptions</h2>
-            <div class="transcription-list"></div>
-        </div>
-
-        <div id="continueSection" class="continue-section" style="display: none;">
-            <h3>Ready to capture live audio?</h3>
-            <a href="/index" class="continue-button">Continue to Live Transcription</a>
         </div>
     </div>
 
@@ -492,7 +601,8 @@
                             
                             const result = await response.json();
                             if (result.success) {
-                                alert('Voice recording saved successfully!');
+                                document.getElementById('continueSection').style.display = 'block';
+                                alert('Voice recording saved successfully! You can now proceed to Live Meeting Notes.');
                             } else {
                                 alert('Failed to save recording: ' + (result.error || 'Unknown error'));
                             }
@@ -524,6 +634,7 @@
             if (e.target.files.length > 0) {
                 const uploadedFilesDiv = document.getElementById('uploadedFiles');
                 const files = Array.from(e.target.files);
+                let allFilesProcessed = true;
                 
                 for (const file of files) {
                     // Create file item element
@@ -551,18 +662,21 @@
                             fileItem.querySelector('.status').textContent = '✓ Processed';
                             fileItem.querySelector('.status').className = 'status success';
                         } else {
+                            allFilesProcessed = false;
                             fileItem.querySelector('.status').textContent = '✗ Failed';
                             fileItem.querySelector('.status').className = 'status error';
                         }
                     } catch (error) {
+                        allFilesProcessed = false;
                         console.error('Error uploading voice file:', error);
                         fileItem.querySelector('.status').textContent = '✗ Error';
                         fileItem.querySelector('.status').className = 'status error';
                     }
                 }
                 
-                if (files.length > 0) {
-                    alert('Voice training completed! All files processed.');
+                if (allFilesProcessed) {
+                    document.getElementById('continueSection').style.display = 'block';
+                    alert('Voice training completed! You can now proceed to Live Meeting Notes.');
                 }
             }
         });

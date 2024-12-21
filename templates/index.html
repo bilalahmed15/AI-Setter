@@ -393,6 +393,17 @@
         .speaker-dropdown:hover {
             border-color: #4299e1;
         }
+
+        .status-bar.error {
+            background-color: #fff5f5;
+            color: #e53e3e;
+            border: 1px solid #feb2b2;
+        }
+
+        .status-bar i.fa-exclamation-circle {
+            color: #e53e3e;
+            margin-right: 8px;
+        }
     </style>
 </head>
 <body>
@@ -453,6 +464,54 @@
         const clearButton = document.getElementById('clearButton');
         let isPaused = false;
 
+        // Check microphone access on page load
+        async function initializeMicrophone() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                // Stop the stream immediately after testing
+                stream.getTracks().forEach(track => track.stop());
+                // Start checking transcriptions if microphone is available
+                setInterval(checkTranscription, 300);
+            } catch (error) {
+                console.error('Microphone access error:', error);
+                // Show user-friendly error message
+                const statusBar = document.querySelector('.status-bar');
+                statusBar.innerHTML = `
+                    <i class="fas fa-exclamation-circle" style="color: #e53e3e;"></i>
+                    Microphone access denied. Please check your browser permissions and refresh the page.
+                `;
+                statusBar.style.backgroundColor = '#fff5f5';
+                statusBar.style.color = '#e53e3e';
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', initializeMicrophone);
+
+        function checkTranscription() {
+            if (isPaused) return;
+
+            fetch('/get_transcription')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Received transcription data:', data);
+                    
+                    if (data.success && data.transcription) {
+                        const emptyState = transcriptionDiv.querySelector('.empty-state');
+                        if (emptyState) {
+                            emptyState.remove();
+                        }
+                        
+                        const transcriptionEntry = createTranscriptionEntry(data);
+                        transcriptionDiv.insertBefore(transcriptionEntry, transcriptionDiv.firstChild);
+                        transcriptionEntry.scrollIntoView({ behavior: 'smooth' });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching transcription:', error);
+                });
+        }
+
         function createTranscriptionEntry(data) {
             console.log('Creating entry with data:', data);
             
@@ -486,33 +545,6 @@
             
             return transcriptionEntry;
         }
-
-        function checkTranscription() {
-            if (isPaused) return;
-
-            fetch('/get_transcription')
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Received transcription data:', data);
-                    
-                    if (data.success && data.transcription) {
-                        const emptyState = transcriptionDiv.querySelector('.empty-state');
-                        if (emptyState) {
-                            emptyState.remove();
-                        }
-                        
-                        const transcriptionEntry = createTranscriptionEntry(data);
-                        transcriptionDiv.insertBefore(transcriptionEntry, transcriptionDiv.firstChild);
-                        transcriptionEntry.scrollIntoView({ behavior: 'smooth' });
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching transcription:', error);
-                });
-        }
-
-        // Start the transcription checking
-        setInterval(checkTranscription, 300);
 
         async function generateAIResponse(transcription) {
             try {
