@@ -57,7 +57,13 @@ is_training = False
 TRAINING_DURATION = 10  # seconds for voice training
 
 # Initialize the OpenAI client
-openai.api_key = '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'  # Replace with your API key
+try:
+    from openai import OpenAI
+    client = OpenAI(api_key='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')
+except ImportError:
+    # Fallback for older versions of openai package
+    import openai
+    openai.api_key = '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'
 
 # Global variables for document storage
 document_context = []
