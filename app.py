@@ -22,6 +22,16 @@ from flask_cors import CORS
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
+
+# Initialize Whisper model at startup
+print("Loading Whisper model...")
+try:
+    app.whisper_model = whisper.load_model("base")
+    print("Whisper model loaded successfully")
+except Exception as e:
+    print(f"Error loading Whisper model: {e}")
+    app.whisper_model = None
+
 # Configure upload folder
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
@@ -594,6 +604,11 @@ def index():
 @app.route('/get_transcription')
 def get_transcription():
     try:
+        # Check if Whisper model is loaded
+        if not hasattr(app, 'whisper_model') or app.whisper_model is None:
+            print("Loading Whisper model...")
+            app.whisper_model = whisper.load_model("base")
+            
         if not transcription_queue.empty():
             data = transcription_queue.get_nowait()
             print(f"Sending transcription: {data}")  # Debug log
