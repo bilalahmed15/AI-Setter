@@ -393,6 +393,29 @@
         .speaker-dropdown:hover {
             border-color: #4299e1;
         }
+
+        .error-message {
+            margin: 20px 0;
+        }
+
+        .error-message .alert {
+            border-radius: 8px;
+            padding: 15px 20px;
+        }
+
+        .error-message i {
+            margin-right: 8px;
+        }
+
+        .error-message ul {
+            margin-top: 10px;
+            margin-bottom: 0;
+            padding-left: 20px;
+        }
+
+        .error-message li {
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
@@ -447,6 +470,65 @@
     </div>
 
     <script>
+        async function checkMicrophoneAccess() {
+            try {
+                // Request microphone permission
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(track => track.stop()); // Clean up
+                return true;
+            } catch (err) {
+                console.error('Microphone access error:', err);
+                return false;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                const hasMicrophone = await checkMicrophoneAccess();
+                
+                if (!hasMicrophone) {
+                    throw new Error('No microphone access. Please ensure your browser has microphone permissions enabled.');
+                }
+
+                // Initialize MediaRecorder only if microphone is available
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(stream => {
+                        mediaRecorder = new MediaRecorder(stream);
+                        setupMediaRecorder();
+                    })
+                    .catch(err => {
+                        console.error('Error accessing microphone:', err);
+                        showError('Unable to access microphone. Please check your permissions and device settings.');
+                    });
+            } catch (error) {
+                console.error('Initialization error:', error);
+                showError(error.message);
+            }
+        });
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.innerHTML = `
+                <div class="alert alert-danger" role="alert">
+                    <i class="fas fa-exclamation-circle"></i>
+                    ${message}
+                    <br>
+                    <small>Please ensure:
+                        <ul>
+                            <li>Your device has a working microphone</li>
+                            <li>You've granted microphone permissions to this site</li>
+                            <li>No other application is using the microphone</li>
+                        </ul>
+                    </small>
+                </div>
+            `;
+            
+            // Insert at the top of the content area
+            const container = document.querySelector('.container');
+            container.insertBefore(errorDiv, container.firstChild);
+        }
+
         const transcriptionDiv = document.getElementById('transcription');
         const aiResponsesDiv = document.getElementById('aiResponses');
         const pauseButton = document.getElementById('pauseButton');
