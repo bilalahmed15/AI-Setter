@@ -394,15 +394,51 @@
             border-color: #4299e1;
         }
 
-        .status-bar.error {
-            background-color: #fff5f5;
-            color: #e53e3e;
-            border: 1px solid #feb2b2;
+        .error-message {
+            margin: 20px 0;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
-        .status-bar i.fa-exclamation-circle {
+        .error-message .alert {
+            border-left: 4px solid #e53e3e;
+            background: #fff5f5;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .error-message i {
             color: #e53e3e;
-            margin-right: 8px;
+            margin-right: 10px;
+        }
+
+        .error-details {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #edf2f7;
+        }
+
+        .error-details h4 {
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+
+        .error-details ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .error-details li {
+            margin-bottom: 8px;
+            color: #4a5568;
+        }
+
+        .error-details p {
+            margin-top: 15px;
+            color: #718096;
+            font-style: italic;
         }
     </style>
 </head>
@@ -458,35 +494,98 @@
     </div>
 
     <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Check if we're in a secure context (HTTPS)
+            if (!window.isSecureContext) {
+                showError('This application requires a secure connection (HTTPS) to access the microphone. Please ensure you\'re using HTTPS.');
+                return;
+            }
+
+            // Check if browser supports getUserMedia
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showError('Your browser doesn\'t support microphone access. Please use a modern browser like Chrome, Firefox, or Safari.');
+                return;
+            }
+
+            try {
+                // Request microphone permission
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: true,
+                    video: false
+                });
+                
+                // Stop the stream immediately after testing
+                stream.getTracks().forEach(track => track.stop());
+                
+                // Initialize MediaRecorder
+                setupAudioRecording();
+                
+            } catch (error) {
+                console.error('Microphone access error:', error);
+                let errorMessage = 'Unable to access microphone. ';
+                
+                if (error.name === 'NotAllowedError') {
+                    errorMessage += 'Please allow microphone access in your browser settings.';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage += 'No microphone device found. Please connect a microphone.';
+                } else {
+                    errorMessage += 'Please check your device settings and browser permissions.';
+                }
+                
+                showError(errorMessage);
+            }
+        });
+
+        function setupAudioRecording() {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    mediaRecorder = new MediaRecorder(stream);
+                    setupMediaRecorder();
+                    updateStatus('Ready to record');
+                })
+                .catch(error => {
+                    console.error('Setup error:', error);
+                    showError('Error setting up audio recording: ' + error.message);
+                });
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.innerHTML = `
+                <div class="alert alert-danger" role="alert">
+                    <i class="fas fa-exclamation-circle"></i>
+                    ${message}
+                    <div class="error-details">
+                        <h4>Troubleshooting Steps:</h4>
+                        <ol>
+                            <li>Ensure you're using HTTPS</li>
+                            <li>Check if your microphone is properly connected</li>
+                            <li>Allow microphone access when prompted</li>
+                            <li>Check browser settings for microphone permissions</li>
+                            <li>Try refreshing the page</li>
+                        </ol>
+                        <p>If problems persist, try using a different browser or device.</p>
+                    </div>
+                </div>
+            `;
+            
+            const container = document.querySelector('.container');
+            container.insertBefore(errorDiv, container.firstChild);
+        }
+
+        function updateStatus(message) {
+            const statusBar = document.querySelector('.status-bar');
+            if (statusBar) {
+                statusBar.innerHTML = `<i class="fas fa-circle"></i> ${message}`;
+            }
+        }
+
         const transcriptionDiv = document.getElementById('transcription');
         const aiResponsesDiv = document.getElementById('aiResponses');
         const pauseButton = document.getElementById('pauseButton');
         const clearButton = document.getElementById('clearButton');
         let isPaused = false;
-
-        // Check microphone access on page load
-        async function initializeMicrophone() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                // Stop the stream immediately after testing
-                stream.getTracks().forEach(track => track.stop());
-                // Start checking transcriptions if microphone is available
-                setInterval(checkTranscription, 300);
-            } catch (error) {
-                console.error('Microphone access error:', error);
-                // Show user-friendly error message
-                const statusBar = document.querySelector('.status-bar');
-                statusBar.innerHTML = `
-                    <i class="fas fa-exclamation-circle" style="color: #e53e3e;"></i>
-                    Microphone access denied. Please check your browser permissions and refresh the page.
-                `;
-                statusBar.style.backgroundColor = '#fff5f5';
-                statusBar.style.color = '#e53e3e';
-            }
-        }
-
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', initializeMicrophone);
 
         function createTranscriptionEntry(data) {
             console.log('Creating entry with data:', data);

@@ -10,7 +10,6 @@ import wave
 from datetime import datetime
 from werkzeug.utils import secure_filename
 from PyPDF2 import PdfReader
-from openai import OpenAI
 import openai
 import librosa
 from scipy.io import wavfile
@@ -23,16 +22,6 @@ from flask_cors import CORS
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
-
-# Initialize Whisper model at startup
-print("Loading Whisper model...")
-try:
-    app.whisper_model = whisper.load_model("base")
-    print("Whisper model loaded successfully")
-except Exception as e:
-    print(f"Error loading Whisper model: {e}")
-    app.whisper_model = None
-
 # Configure upload folder
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
@@ -57,13 +46,7 @@ is_training = False
 TRAINING_DURATION = 10  # seconds for voice training
 
 # Initialize the OpenAI client
-try:
-    from openai import OpenAI
-    client = OpenAI(api_key='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')
-except ImportError:
-    # Fallback for older versions of openai package
-    import openai
-    openai.api_key = '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'
+openai.api_key = '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'  # Replace with your API key
 
 # Global variables for document storage
 document_context = []
@@ -611,11 +594,6 @@ def index():
 @app.route('/get_transcription')
 def get_transcription():
     try:
-        # Check if Whisper model is loaded
-        if not hasattr(app, 'whisper_model') or app.whisper_model is None:
-            print("Loading Whisper model...")
-            app.whisper_model = whisper.load_model("base")
-            
         if not transcription_queue.empty():
             data = transcription_queue.get_nowait()
             print(f"Sending transcription: {data}")  # Debug log
