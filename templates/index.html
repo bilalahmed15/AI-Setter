@@ -440,6 +440,17 @@
             color: #718096;
             font-style: italic;
         }
+
+        .status-bar.error {
+            background-color: #fff5f5;
+            color: #e53e3e;
+            border: 1px solid #feb2b2;
+        }
+
+        .status-bar i.fa-exclamation-circle {
+            color: #e53e3e;
+            margin-right: 8px;
+        }
     </style>
 </head>
 <body>
@@ -494,98 +505,58 @@
     </div>
 
     <script>
-        let mediaRecorder;
         const transcriptionDiv = document.getElementById('transcription');
         const aiResponsesDiv = document.getElementById('aiResponses');
         const pauseButton = document.getElementById('pauseButton');
         const clearButton = document.getElementById('clearButton');
         let isPaused = false;
 
-        document.addEventListener('DOMContentLoaded', async function() {
-            // Check if we're in a secure context (HTTPS)
-            if (!window.isSecureContext) {
-                showError('This application requires a secure connection (HTTPS) to access the microphone. Please ensure you\'re using HTTPS.');
-                return;
-            }
-
-            // Check if browser supports getUserMedia
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                showError('Your browser doesn\'t support microphone access. Please use a modern browser like Chrome, Firefox, or Safari.');
-                return;
-            }
-
+        // Check microphone access on page load
+        async function initializeMicrophone() {
             try {
-                // Request microphone permission
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: true,
-                    video: false
-                });
-                
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 // Stop the stream immediately after testing
                 stream.getTracks().forEach(track => track.stop());
-                
-                // Initialize MediaRecorder
-                setupAudioRecording();
-                
+                // Start checking transcriptions if microphone is available
+                setInterval(checkTranscription, 300);
             } catch (error) {
                 console.error('Microphone access error:', error);
-                let errorMessage = 'Unable to access microphone. ';
-                
-                if (error.name === 'NotAllowedError') {
-                    errorMessage += 'Please allow microphone access in your browser settings.';
-                } else if (error.name === 'NotFoundError') {
-                    errorMessage += 'No microphone device found. Please connect a microphone.';
-                } else {
-                    errorMessage += 'Please check your device settings and browser permissions.';
-                }
-                
-                showError(errorMessage);
+                // Show user-friendly error message
+                const statusBar = document.querySelector('.status-bar');
+                statusBar.innerHTML = `
+                    <i class="fas fa-exclamation-circle" style="color: #e53e3e;"></i>
+                    Microphone access denied. Please check your browser permissions and refresh the page.
+                `;
+                statusBar.style.backgroundColor = '#fff5f5';
+                statusBar.style.color = '#e53e3e';
             }
-        });
+        }
 
-        function setupAudioRecording() {
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(stream => {
-                    mediaRecorder = new MediaRecorder(stream);
-                    setupMediaRecorder();
-                    updateStatus('Ready to record');
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', initializeMicrophone);
+
+        function checkTranscription() {
+            if (isPaused) return;
+
+            fetch('/get_transcription')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Received transcription data:', data);
+                    
+                    if (data.success && data.transcription) {
+                        const emptyState = transcriptionDiv.querySelector('.empty-state');
+                        if (emptyState) {
+                            emptyState.remove();
+                        }
+                        
+                        const transcriptionEntry = createTranscriptionEntry(data);
+                        transcriptionDiv.insertBefore(transcriptionEntry, transcriptionDiv.firstChild);
+                        transcriptionEntry.scrollIntoView({ behavior: 'smooth' });
+                    }
                 })
                 .catch(error => {
-                    console.error('Setup error:', error);
-                    showError('Error setting up audio recording: ' + error.message);
+                    console.error('Error fetching transcription:', error);
                 });
-        }
-
-        function showError(message) {
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-message';
-            errorDiv.innerHTML = `
-                <div class="alert alert-danger" role="alert">
-                    <i class="fas fa-exclamation-circle"></i>
-                    ${message}
-                    <div class="error-details">
-                        <h4>Troubleshooting Steps:</h4>
-                        <ol>
-                            <li>Ensure you're using HTTPS</li>
-                            <li>Check if your microphone is properly connected</li>
-                            <li>Allow microphone access when prompted</li>
-                            <li>Check browser settings for microphone permissions</li>
-                            <li>Try refreshing the page</li>
-                        </ol>
-                        <p>If problems persist, try using a different browser or device.</p>
-                    </div>
-                </div>
-            `;
-            
-            const container = document.querySelector('.container');
-            container.insertBefore(errorDiv, container.firstChild);
-        }
-
-        function updateStatus(message) {
-            const statusBar = document.querySelector('.status-bar');
-            if (statusBar) {
-                statusBar.innerHTML = `<i class="fas fa-circle"></i> ${message}`;
-            }
         }
 
         function createTranscriptionEntry(data) {
@@ -621,33 +592,6 @@
             
             return transcriptionEntry;
         }
-
-        function checkTranscription() {
-            if (isPaused) return;
-
-            fetch('/get_transcription')
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Received transcription data:', data);
-                    
-                    if (data.success && data.transcription) {
-                        const emptyState = transcriptionDiv.querySelector('.empty-state');
-                        if (emptyState) {
-                            emptyState.remove();
-                        }
-                        
-                        const transcriptionEntry = createTranscriptionEntry(data);
-                        transcriptionDiv.insertBefore(transcriptionEntry, transcriptionDiv.firstChild);
-                        transcriptionEntry.scrollIntoView({ behavior: 'smooth' });
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching transcription:', error);
-                });
-        }
-
-        // Start the transcription checking
-        setInterval(checkTranscription, 300);
 
         async function generateAIResponse(transcription) {
             try {
