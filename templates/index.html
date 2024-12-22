@@ -451,6 +451,22 @@
             color: #e53e3e;
             margin-right: 8px;
         }
+
+        .audio-level-container {
+            width: 200px;
+            height: 10px;
+            background-color: #eee;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .audio-level {
+            height: 100%;
+            width: 0%;
+            background-color: #ccc;
+            transition: width 0.1s ease;
+        }
     </style>
 </head>
 <body>
@@ -504,6 +520,10 @@
         </div>
     </div>
 
+    <div class="audio-level-container">
+        <div class="audio-level"></div>
+    </div>
+
     <script>
         let mediaRecorder;
         const transcriptionDiv = document.getElementById('transcription');
@@ -534,7 +554,7 @@
                 statusBar.innerHTML = '<i class="fas fa-microphone"></i> Microphone ready';
                 
                 // Start checking for transcriptions
-                setInterval(checkTranscription, 300);
+                setInterval(checkTranscription, 100);
                 
             } catch (error) {
                 console.error('Microphone initialization error:', error);
@@ -590,7 +610,12 @@
             if (isPaused) return;
 
             fetch('/get_transcription')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     console.log('Received transcription data:', data);
                     
@@ -603,6 +628,8 @@
                         const transcriptionEntry = createTranscriptionEntry(data);
                         transcriptionDiv.insertBefore(transcriptionEntry, transcriptionDiv.firstChild);
                         transcriptionEntry.scrollIntoView({ behavior: 'smooth' });
+                    } else if (data.error) {
+                        console.error('Transcription error:', data.error);
                     }
                 })
                 .catch(error => {
@@ -698,6 +725,47 @@
                     <p>AI responses will appear here...</p>
                 </div>
             `;
+        });
+
+        // Add audio level indicator
+        function showAudioLevel() {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    const audioContext = new AudioContext();
+                    const source = audioContext.createMediaStreamSource(stream);
+                    const analyzer = audioContext.createAnalyser();
+                    analyzer.fftSize = 256;
+                    source.connect(analyzer);
+
+                    const bufferLength = analyzer.frequencyBinCount;
+                    const dataArray = new Uint8Array(bufferLength);
+
+                    function updateLevel() {
+                        analyzer.getByteFrequencyData(dataArray);
+                        const average = dataArray.reduce((a, b) => a + b) / bufferLength;
+                        const level = average / 128.0;  // Normalize to 0-1
+                        
+                        const indicator = document.querySelector('.audio-level');
+                        if (indicator) {
+                            indicator.style.width = `${level * 100}%`;
+                            if (level > 0.1) {  // Threshold for "speaking"
+                                indicator.style.backgroundColor = '#4CAF50';
+                            } else {
+                                indicator.style.backgroundColor = '#ccc';
+                            }
+                        }
+                        
+                        requestAnimationFrame(updateLevel);
+                    }
+
+                    updateLevel();
+                })
+                .catch(error => console.error('Audio level error:', error));
+        }
+
+        // Call this when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            showAudioLevel();
         });
     </script>
 </body>

@@ -18,6 +18,7 @@ import io
 from scipy.signal import find_peaks
 from scipy import stats
 from flask_cors import CORS
+import traceback
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -539,6 +540,7 @@ def process_audio():
                         sf.write(temp_path, audio_data, RATE)
                         
                         # Get transcription
+                        print("Running Whisper transcription...")
                         result = app.whisper_model.transcribe(temp_path)
                         transcription = result['text'].strip()
                         
@@ -547,13 +549,14 @@ def process_audio():
                         print(f"Detected speaker: {speaker_label}")
                         
                         if transcription:
-                            print(f"Transcribed: {transcription}")
+                            print(f"Transcribed text: {transcription}")
                             transcription_queue.put({
                                 'success': True,
                                 'transcription': transcription,
-                                'speaker': speaker_label,  # Just use the label directly
+                                'speaker': speaker_label,
                                 'type': 'final'
                             })
+                            print("Added to transcription queue")
                         
                         # Clean up
                         if os.path.exists(temp_path):
@@ -561,6 +564,7 @@ def process_audio():
                             
                     except Exception as e:
                         print(f"Error in transcription: {e}")
+                        print(f"Stack trace: {traceback.format_exc()}")
                     
                     is_recording = False
                     frames = []
@@ -571,6 +575,7 @@ def process_audio():
             continue
         except Exception as e:
             print(f"Error in audio processing: {e}")
+            print(f"Stack trace: {traceback.format_exc()}")
 
 @app.route('/')
 def home():
