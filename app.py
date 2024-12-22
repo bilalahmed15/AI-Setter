@@ -581,42 +581,68 @@ def home():
 
 @app.route('/index')
 def index():
+    """
+    Route for the main transcription page.
+    Initializes audio capture and returns the index template.
+    """
     global is_listening
     try:
-        # Test audio device availability
-        devices = sd.query_devices()
-        input_device = None
-        for device in devices:
-            if device['max_input_channels'] > 0:
-                input_device = device['index']
-                break
-                
-        if input_device is None:
-            return jsonify({'error': 'No microphone found'}), 400
-            
-        # Start audio capture when navigating to index page
-        is_listening = True
-        start_background_threads()
-        return render_template('index.html')
-    except Exception as e:
-        return jsonify({'error': f'Error accessing microphone: {str(e)}'}), 400
-
-@app.route('/get_transcription')
-def get_transcription():
-    try:
-        # Check if Whisper model is loaded
+        # Initialize Whisper model if not already loaded
         if not hasattr(app, 'whisper_model') or app.whisper_model is None:
             print("Loading Whisper model...")
             app.whisper_model = whisper.load_model("base")
+            print("Whisper model loaded successfully")
+
+        # Test audio device availability without blocking
+        try:
+            devices = sd.query_devices()
+            input_device = None
+            for device in devices:
+                if device['max_input_channels'] > 0:
+                    input_device = device['index']
+                    break
             
+            if input_device is not None:
+                # Start background threads only if device is available
+                is_listening = True
+                start_background_threads()
+        except Exception as audio_error:
+            print(f"Audio device initialization warning: {audio_error}")
+            # Continue loading the page even if audio init fails
+            # Client-side will handle microphone permissions
+        
+        # Always return the template - let client handle mic permissions
+        return render_template('index.html')
+        
+    except Exception as e:
+        print(f"Error in index route: {e}")
+        # Still return the template, let client-side handle errors
+        return render_template('index.html')
+
+@app.route('/get_transcription')
+def get_transcription():
+    """
+    Route to get the latest transcription from the queue.
+    Returns transcription data if available.
+    """
+    try:
+        # Verify Whisper model is loaded
+        if not hasattr(app, 'whisper_model') or app.whisper_model is None:
+            print("Reloading Whisper model...")
+            app.whisper_model = whisper.load_model("base")
+
         if not transcription_queue.empty():
             data = transcription_queue.get_nowait()
             print(f"Sending transcription: {data}")  # Debug log
             return jsonify(data)
-        return jsonify({'success': False})
+        return jsonify({'success': False, 'message': 'No new transcription available'})
     except Exception as e:
         print(f"Error getting transcription: {e}")
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({
+            'success': False, 
+            'error': str(e),
+            'message': 'Error processing transcription request'
+        })
 
 @app.route('/upload', methods=['POST'])
 def upload_files():

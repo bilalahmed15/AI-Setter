@@ -505,35 +505,86 @@
     </div>
 
     <script>
+        let mediaRecorder;
         const transcriptionDiv = document.getElementById('transcription');
         const aiResponsesDiv = document.getElementById('aiResponses');
         const pauseButton = document.getElementById('pauseButton');
         const clearButton = document.getElementById('clearButton');
         let isPaused = false;
 
-        // Check microphone access on page load
-        async function initializeMicrophone() {
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', async function() {
             try {
+                // Check if we're in a secure context (HTTPS)
+                if (!window.isSecureContext) {
+                    showError('This application requires a secure connection (HTTPS) to access the microphone.');
+                    return;
+                }
+
+                // Request microphone permission
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                // Stop the stream immediately after testing
-                stream.getTracks().forEach(track => track.stop());
-                // Start checking transcriptions if microphone is available
-                setInterval(checkTranscription, 300);
-            } catch (error) {
-                console.error('Microphone access error:', error);
-                // Show user-friendly error message
+                console.log('Microphone access granted');
+                
+                // Initialize MediaRecorder
+                mediaRecorder = new MediaRecorder(stream);
+                setupMediaRecorder();
+                
+                // Update UI to show ready state
                 const statusBar = document.querySelector('.status-bar');
+                statusBar.innerHTML = '<i class="fas fa-microphone"></i> Microphone ready';
+                
+                // Start checking for transcriptions
+                setInterval(checkTranscription, 300);
+                
+            } catch (error) {
+                console.error('Microphone initialization error:', error);
+                showError(`Microphone access error: ${error.message}`);
+            }
+        });
+
+        function showError(message) {
+            const statusBar = document.querySelector('.status-bar');
+            if (statusBar) {
                 statusBar.innerHTML = `
-                    <i class="fas fa-exclamation-circle" style="color: #e53e3e;"></i>
-                    Microphone access denied. Please check your browser permissions and refresh the page.
+                    <i class="fas fa-exclamation-circle"></i>
+                    ${message}
                 `;
-                statusBar.style.backgroundColor = '#fff5f5';
-                statusBar.style.color = '#e53e3e';
+                statusBar.classList.add('error');
             }
         }
 
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', initializeMicrophone);
+        function setupMediaRecorder() {
+            if (!mediaRecorder) return;
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    const audioChunk = new Blob([event.data], { type: 'audio/wav' });
+                    const formData = new FormData();
+                    formData.append('audio', audioChunk);
+
+                    fetch('/process_audio', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .catch(error => {
+                        console.error('Error sending audio chunk:', error);
+                    });
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                console.log('MediaRecorder stopped');
+            };
+
+            mediaRecorder.onstart = () => {
+                console.log('MediaRecorder started');
+            };
+
+            mediaRecorder.onerror = (event) => {
+                console.error('MediaRecorder error:', event.error);
+                showError('Error recording audio');
+            };
+        }
 
         function checkTranscription() {
             if (isPaused) return;
@@ -647,61 +698,6 @@
                     <p>AI responses will appear here...</p>
                 </div>
             `;
-        });
-
-        function setupMediaRecorder() {
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    const audioChunk = new Blob([event.data], { type: 'audio/wav' });
-                    const formData = new FormData();
-                    formData.append('audio', audioChunk);
-
-                    fetch('/process_audio', {
-                        method: 'POST',
-                        body: formData
-                    })
-                    .catch(error => {
-                        console.error('Error sending audio chunk:', error);
-                    });
-                }
-            };
-
-            mediaRecorder.onstop = () => {
-                updateStatus('Recording stopped');
-            };
-
-            mediaRecorder.onstart = () => {
-                updateStatus('Recording in progress...');
-            };
-
-            mediaRecorder.onerror = (event) => {
-                console.error('MediaRecorder error:', event.error);
-                updateStatus('Error recording audio');
-            };
-        }
-
-        // Initialize audio recording
-        document.addEventListener('DOMContentLoaded', async function() {
-            try {
-                // Check if we're in a secure context (HTTPS)
-                if (!window.isSecureContext) {
-                    showError('This application requires a secure connection (HTTPS) to access the microphone.');
-                    return;
-                }
-
-                // Request microphone permission
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                setupMediaRecorder();
-                updateStatus('Ready to record');
-                
-                // Start checking for transcriptions
-                setInterval(checkTranscription, 300);
-                
-            } catch (error) {
-                console.error('Setup error:', error);
-                showError('Error setting up audio recording: ' + error.message);
-            }
         });
     </script>
 </body>
