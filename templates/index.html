@@ -440,33 +440,6 @@
             color: #718096;
             font-style: italic;
         }
-
-        .status-bar.error {
-            background-color: #fff5f5;
-            color: #e53e3e;
-            border: 1px solid #feb2b2;
-        }
-
-        .status-bar i.fa-exclamation-circle {
-            color: #e53e3e;
-            margin-right: 8px;
-        }
-
-        .audio-level-container {
-            width: 200px;
-            height: 10px;
-            background-color: #eee;
-            border-radius: 5px;
-            overflow: hidden;
-            margin: 10px 0;
-        }
-
-        .audio-level {
-            height: 100%;
-            width: 0%;
-            background-color: #ccc;
-            transition: width 0.1s ease;
-        }
     </style>
 </head>
 <body>
@@ -520,122 +493,12 @@
         </div>
     </div>
 
-    <div class="audio-level-container">
-        <div class="audio-level"></div>
-    </div>
-
     <script>
-        let mediaRecorder;
         const transcriptionDiv = document.getElementById('transcription');
         const aiResponsesDiv = document.getElementById('aiResponses');
         const pauseButton = document.getElementById('pauseButton');
         const clearButton = document.getElementById('clearButton');
         let isPaused = false;
-
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', async function() {
-            try {
-                // Check if we're in a secure context (HTTPS)
-                if (!window.isSecureContext) {
-                    showError('This application requires a secure connection (HTTPS) to access the microphone.');
-                    return;
-                }
-
-                // Request microphone permission
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                console.log('Microphone access granted');
-                
-                // Initialize MediaRecorder
-                mediaRecorder = new MediaRecorder(stream);
-                setupMediaRecorder();
-                
-                // Update UI to show ready state
-                const statusBar = document.querySelector('.status-bar');
-                statusBar.innerHTML = '<i class="fas fa-microphone"></i> Microphone ready';
-                
-                // Start checking for transcriptions
-                setInterval(checkTranscription, 100);
-                
-            } catch (error) {
-                console.error('Microphone initialization error:', error);
-                showError(`Microphone access error: ${error.message}`);
-            }
-        });
-
-        function showError(message) {
-            const statusBar = document.querySelector('.status-bar');
-            if (statusBar) {
-                statusBar.innerHTML = `
-                    <i class="fas fa-exclamation-circle"></i>
-                    ${message}
-                `;
-                statusBar.classList.add('error');
-            }
-        }
-
-        function setupMediaRecorder() {
-            if (!mediaRecorder) return;
-
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    const audioChunk = new Blob([event.data], { type: 'audio/wav' });
-                    const formData = new FormData();
-                    formData.append('audio', audioChunk);
-
-                    fetch('/process_audio', {
-                        method: 'POST',
-                        body: formData
-                    })
-                    .catch(error => {
-                        console.error('Error sending audio chunk:', error);
-                    });
-                }
-            };
-
-            mediaRecorder.onstop = () => {
-                console.log('MediaRecorder stopped');
-            };
-
-            mediaRecorder.onstart = () => {
-                console.log('MediaRecorder started');
-            };
-
-            mediaRecorder.onerror = (event) => {
-                console.error('MediaRecorder error:', event.error);
-                showError('Error recording audio');
-            };
-        }
-
-        function checkTranscription() {
-            if (isPaused) return;
-
-            fetch('/get_transcription')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Received transcription data:', data);
-                    
-                    if (data.success && data.transcription) {
-                        const emptyState = transcriptionDiv.querySelector('.empty-state');
-                        if (emptyState) {
-                            emptyState.remove();
-                        }
-                        
-                        const transcriptionEntry = createTranscriptionEntry(data);
-                        transcriptionDiv.insertBefore(transcriptionEntry, transcriptionDiv.firstChild);
-                        transcriptionEntry.scrollIntoView({ behavior: 'smooth' });
-                    } else if (data.error) {
-                        console.error('Transcription error:', data.error);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching transcription:', error);
-                });
-        }
 
         function createTranscriptionEntry(data) {
             console.log('Creating entry with data:', data);
@@ -665,14 +528,49 @@
             
             // Only generate AI response for Client messages
             if (data.type === 'final' && displaySpeaker === 'Client') {
+                console.log('Generating AI response for Client message');
                 generateAIResponse(data.transcription);
+            } else {
+                console.log('Skipping AI response for speaker:', displaySpeaker);
             }
             
             return transcriptionEntry;
         }
 
+        function checkTranscriptions() {
+            if (isPaused) {
+                setTimeout(checkTranscriptions, 1000);
+                return;
+            }
+
+            fetch('/get_transcription')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Received transcription data:", data);
+                    if (data.success && data.transcription) {
+                        displayTranscription(data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking transcriptions:', error);
+                })
+                .finally(() => {
+                    setTimeout(checkTranscriptions, 1000);
+                });
+        }
+
+        // Start the transcription checking
+        setInterval(checkTranscriptions, 300);
+
         async function generateAIResponse(transcription) {
             try {
+                console.log('Generating AI response for:', transcription);
+                
                 const response = await fetch('/get_ai_response', {
                     method: 'POST',
                     headers: {
@@ -681,15 +579,31 @@
                     body: JSON.stringify({ transcription: transcription })
                 });
                 
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const data = await response.json();
+                console.log('AI response data:', data);
+                
                 if (data.success && data.response) {
                     const aiResponseEntry = document.createElement('div');
                     aiResponseEntry.className = 'entry ai-response-entry';
                     aiResponseEntry.innerHTML = `
                         <div class="timestamp">
-                            <i class="fas fa-robot"></i> ${new Date().toLocaleTimeString()}
+                            <i class="fas fa-robot"></i> ${new Date().toLocaleTimeString([], { 
+                                hour: '2-digit', 
+                                minute: '2-digit',
+                                second: '2-digit',
+                                hour12: false 
+                            })}
                         </div>
-                        <div class="text">${data.response}</div>
+                        <div class="message-container">
+                            <div class="speaker-label">
+                                <i class="fas fa-robot"></i> AI Assistant
+                            </div>
+                            <div class="message-text">${data.response}</div>
+                        </div>
                     `;
                     
                     // Remove empty state if exists
@@ -698,6 +612,8 @@
                     
                     aiResponsesDiv.insertBefore(aiResponseEntry, aiResponsesDiv.firstChild);
                     aiResponseEntry.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    console.error('AI response error:', data.error);
                 }
             } catch (error) {
                 console.error('Error generating AI response:', error);
@@ -727,46 +643,104 @@
             `;
         });
 
-        // Add audio level indicator
-        function showAudioLevel() {
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(stream => {
-                    const audioContext = new AudioContext();
-                    const source = audioContext.createMediaStreamSource(stream);
-                    const analyzer = audioContext.createAnalyser();
-                    analyzer.fftSize = 256;
-                    source.connect(analyzer);
+        function setupMediaRecorder() {
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    const audioChunk = new Blob([event.data], { type: 'audio/wav' });
+                    const formData = new FormData();
+                    formData.append('audio', audioChunk);
 
-                    const bufferLength = analyzer.frequencyBinCount;
-                    const dataArray = new Uint8Array(bufferLength);
+                    fetch('/process_audio', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .catch(error => {
+                        console.error('Error sending audio chunk:', error);
+                    });
+                }
+            };
 
-                    function updateLevel() {
-                        analyzer.getByteFrequencyData(dataArray);
-                        const average = dataArray.reduce((a, b) => a + b) / bufferLength;
-                        const level = average / 128.0;  // Normalize to 0-1
-                        
-                        const indicator = document.querySelector('.audio-level');
-                        if (indicator) {
-                            indicator.style.width = `${level * 100}%`;
-                            if (level > 0.1) {  // Threshold for "speaking"
-                                indicator.style.backgroundColor = '#4CAF50';
-                            } else {
-                                indicator.style.backgroundColor = '#ccc';
-                            }
-                        }
-                        
-                        requestAnimationFrame(updateLevel);
-                    }
+            mediaRecorder.onstop = () => {
+                updateStatus('Recording stopped');
+            };
 
-                    updateLevel();
-                })
-                .catch(error => console.error('Audio level error:', error));
+            mediaRecorder.onstart = () => {
+                updateStatus('Recording in progress...');
+            };
+
+            mediaRecorder.onerror = (event) => {
+                console.error('MediaRecorder error:', event.error);
+                updateStatus('Error recording audio');
+            };
         }
 
-        // Call this when the page loads
-        document.addEventListener('DOMContentLoaded', () => {
-            showAudioLevel();
+        // Initialize audio recording
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                // Check for secure context
+                if (!window.isSecureContext) {
+                    console.error('Application requires HTTPS for microphone access');
+                    return;
+                }
+
+                // Request microphone permission
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                console.log('Microphone permission granted');
+
+                // Start checking for transcriptions
+                checkTranscriptions();
+                
+                // Update status
+                document.querySelector('.status-bar').innerHTML = 
+                    '<i class="fas fa-circle" style="color: #48bb78;"></i> Listening to audio...';
+
+            } catch (error) {
+                console.error('Setup error:', error);
+                document.querySelector('.status-bar').innerHTML = 
+                    '<i class="fas fa-circle" style="color: #e53e3e;"></i> Error: ' + error.message;
+            }
         });
+
+        function displayTranscription(data) {
+            console.log('Displaying transcription:', data);
+            
+            // Remove empty state if it exists
+            const emptyState = transcriptionDiv.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            // Create and add the new transcription entry
+            const entry = createTranscriptionEntry(data);
+            transcriptionDiv.insertBefore(entry, transcriptionDiv.firstChild);
+            entry.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.innerHTML = `
+                <div class="alert">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    ${message}
+                </div>
+                <div class="error-details">
+                    <h4>Troubleshooting steps:</h4>
+                    <ol>
+                        <li>Make sure your microphone is connected and working</li>
+                        <li>Allow microphone access when prompted</li>
+                        <li>Try refreshing the page</li>
+                        <li>Check if your browser supports audio recording</li>
+                    </ol>
+                    <p>If the problem persists, please try using a different browser or device.</p>
+                </div>
+            `;
+            
+            document.querySelector('.container').insertBefore(
+                errorDiv, 
+                document.querySelector('.conversation-container')
+            );
+        }
     </script>
 </body>
 </html> 

@@ -7,18 +7,17 @@ import sounddevice as sd
 import soundfile as sf
 import numpy as np
 import wave
+import librosa
 from datetime import datetime
 from werkzeug.utils import secure_filename
 from PyPDF2 import PdfReader
-import openai
-import librosa
+from dotenv import load_dotenv
 from scipy.io import wavfile
 from sklearn.preprocessing import StandardScaler
 import io
 from scipy.signal import find_peaks
 from scipy import stats
 from flask_cors import CORS
-import traceback
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -57,7 +56,13 @@ is_training = False
 TRAINING_DURATION = 10  # seconds for voice training
 
 # Initialize the OpenAI client
-openai.api_key = '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'  # Replace with your API key
+load_dotenv()
+try:
+    from openai import OpenAI
+    client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+except ImportError:
+    import openai
+    openai.api_key = os.getenv('OPENAI_API_KEY')
 
 # Global variables for document storage
 document_context = []
@@ -448,12 +453,9 @@ def audio_callback(indata, frames, time, status):
 def get_ai_response(transcription):
     try:
         print(f"Generating AI response for: {transcription}")
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo-16k",
-            messages=[
-                {
-                    "role": "system",
-                    "content": f"""You are Alex, a senior SaaS solutions consultant with expertise in helping businesses optimize their operations through software solutions. You are authorized to discuss only the following domains:
+        
+        # Base system prompt with structured guidance
+        system_prompt = """You are Alex, a senior SaaS solutions consultant with expertise in helping businesses optimize their operations through software solutions. You are authorized to discuss only the following domains:
 
 Authorized Discussion Areas:
 1. Business process optimization through our SaaS solutions
@@ -469,17 +471,37 @@ Core Responsibilities:
    - For business challenges: Say "Let me address your needs regarding [business area]..." and provide strategic recommendations
    - For out-of-scope queries: Say "While I specialize in [our solution areas], that specific topic is outside my expertise. Let me focus on how our solutions can help with..."
 
+Response Format Requirements:
+1. Use clear headings and subheadings with "##" and "###" markdown
+2. Break down complex information into bullet points
+3. Use numbered lists for sequential steps or processes
+4. Include line breaks between sections for readability
+5. Highlight key points using bold text (**)
+6. Structure responses in easily scannable sections
+7. Use concise paragraphs (3-4 lines maximum)
+
 Your Response Structure:
-1. Acknowledge business context: "I understand your organization is looking to [specific business need]..."
+1. Acknowledge business context:
+   ## Understanding Your Needs
+   "I understand your organization is looking to [specific business need]..."
+
 2. Present solution strategy:
+   ## Recommended Solution
    - Connect business needs to specific features
    - Provide implementation examples
    - Highlight integration possibilities
+
 3. Demonstrate business value:
+   ## Business Impact
    - Efficiency gains
    - Cost benefits
    - Operational improvements
-4. Recommend clear next steps
+
+4. Recommend clear next steps:
+   ## Action Plan
+   1. Immediate steps
+   2. Implementation timeline
+   3. Success metrics
 
 Communication Guidelines:
 - Use business-focused language
@@ -487,23 +509,59 @@ Communication Guidelines:
 - Reference relevant case applications
 - Keep responses strategic and value-oriented
 - Only discuss solutions and features documented in our materials
+- Format responses for maximum readability and clarity"""
 
-Available Solutions:
-{context_docs}
+        # Add any available document context
+        if document_context:
+            context_text = "\n\nAvailable Solutions:\n" + "\n".join(
+                f"- {doc['content']}" for doc in document_context
+            )
+            system_prompt += context_text
 
-Expert Focus: Provide strategic SaaS solutions that align with client's business objectives and operational needs, strictly within our documented capabilities."""
-                },
-                {"role": "user", "content": transcription}
-            ],
-            max_tokens=500,
-            temperature=0.7
-        )
-        ai_response = response.choices[0].message['content']
-        print(f"AI Response generated: {ai_response}")
-        return ai_response
+        system_prompt += "\n\nExpert Focus: Provide strategic SaaS solutions that align with client's business objectives and operational needs, strictly within our documented capabilities. Always maintain clear structure and formatting in responses for easy reading and comprehension."
+        
+        # Use the new OpenAI client if available
+        try:
+            if 'client' in globals():
+                response = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": system_prompt
+                        },
+                        {"role": "user", "content": transcription}
+                    ],
+                    max_tokens=500,
+                    temperature=0.7
+                )
+                ai_response = response.choices[0].message.content
+            else:
+                # Fallback to old API
+                response = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": system_prompt
+                        },
+                        {"role": "user", "content": transcription}
+                    ],
+                    max_tokens=500,
+                    temperature=0.7
+                )
+                ai_response = response.choices[0].message['content']
+                
+            print(f"AI Response generated: {ai_response}")
+            return ai_response
+            
+        except Exception as api_error:
+            print(f"OpenAI API error: {str(api_error)}")
+            return f"I apologize, but I'm having trouble generating a response right now. Error: {str(api_error)}"
+            
     except Exception as e:
-        print(f"Error generating AI response: {str(e)}")
-        return None
+        print(f"Error in get_ai_response: {str(e)}")
+        return "I apologize, but I'm having trouble processing your request right now."
 
 def process_audio():
     frames = []
@@ -540,7 +598,6 @@ def process_audio():
                         sf.write(temp_path, audio_data, RATE)
                         
                         # Get transcription
-                        print("Running Whisper transcription...")
                         result = app.whisper_model.transcribe(temp_path)
                         transcription = result['text'].strip()
                         
@@ -549,14 +606,13 @@ def process_audio():
                         print(f"Detected speaker: {speaker_label}")
                         
                         if transcription:
-                            print(f"Transcribed text: {transcription}")
+                            print(f"Transcribed: {transcription}")
                             transcription_queue.put({
                                 'success': True,
                                 'transcription': transcription,
-                                'speaker': speaker_label,
+                                'speaker': speaker_label,  # Just use the label directly
                                 'type': 'final'
                             })
-                            print("Added to transcription queue")
                         
                         # Clean up
                         if os.path.exists(temp_path):
@@ -564,7 +620,6 @@ def process_audio():
                             
                     except Exception as e:
                         print(f"Error in transcription: {e}")
-                        print(f"Stack trace: {traceback.format_exc()}")
                     
                     is_recording = False
                     frames = []
@@ -575,7 +630,6 @@ def process_audio():
             continue
         except Exception as e:
             print(f"Error in audio processing: {e}")
-            print(f"Stack trace: {traceback.format_exc()}")
 
 @app.route('/')
 def home():
@@ -717,20 +771,31 @@ def generate_ai_response():
     try:
         data = request.json
         transcription = data.get('transcription')
+        
         if not transcription:
-            return jsonify({'success': False, 'error': 'No transcription provided'})
+            return jsonify({
+                'success': False, 
+                'error': 'No transcription provided'
+            })
+        
+        # Add debug logging
+        print(f"Received transcription for AI response: {transcription}")
         
         ai_response = get_ai_response(transcription)
         if ai_response:
+            print(f"Sending AI response: {ai_response}")
             return jsonify({
                 'success': True,
                 'response': ai_response
             })
+            
         return jsonify({
             'success': False,
             'error': 'Failed to generate AI response'
         })
+        
     except Exception as e:
+        print(f"Error in generate_ai_response route: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -913,6 +978,4 @@ def health_check():
        '', 500
 
 if __name__ == '__main__':
-    # Get port from environment variable or default to 8080
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
+    app.run(debug=False, threaded=True)
