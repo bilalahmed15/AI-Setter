@@ -17,9 +17,11 @@ from sklearn.preprocessing import StandardScaler
 import io
 from scipy.signal import find_peaks
 from scipy import stats
+from flask_cors import CORS
 
 # Initialize Flask app
 app = Flask(__name__)
+CORS(app)
 
 # Configure upload folder
 UPLOAD_FOLDER = 'uploads'
@@ -45,7 +47,7 @@ is_training = False
 TRAINING_DURATION = 10  # seconds for voice training
 
 # Initialize the OpenAI client
-client = OpenAI(api_key=' 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')  # Replace with your API key
+client = OpenAI(api_key='')  # Replace with your API key
 
 # Global variables for document storage
 document_context = []
@@ -843,4 +845,5 @@ def clear_document_context():
     return jsonify({'success': True, 'message': 'Document context cleared'})
 
 if __name__ == '__main__':
-    app.run(debug=False, threaded=True)
+    print("Starting Flask server on http://127.0.0.1:5000")
+    app.run(host='127.0.0.1', port=5000, debug=True)
