@@ -5,3 +5,4 @@ uploads/
 venv/
 .env
 voice_training/
+node_modules/

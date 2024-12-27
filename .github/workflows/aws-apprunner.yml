@@ -6,7 +6,11 @@ on:
       - main
 
 env:
+<<<<<<< HEAD
   AWS_REGION: us-east-1
+=======
+  AWS_REGION: eu-west-1
+>>>>>>> 0e843a8ee52c56839d3188fe2d9aff95e3d9df98
   ECR_REPOSITORY: whisper-transcription
   IMAGE_TAG: latest
 
@@ -22,8 +26,13 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
+<<<<<<< HEAD
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+=======
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+>>>>>>> 0e843a8ee52c56839d3188fe2d9aff95e3d9df98
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
@@ -33,6 +42,7 @@ jobs:
       - name: Build and push image to Amazon ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+<<<<<<< HEAD
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
@@ -54,3 +64,10 @@ jobs:
             OMP_NUM_THREADS=1
             MKL_NUM_THREADS=1
             NUMEXPR_NUM_THREADS=1 
+=======
+          ECR_REPOSITORY: aissetter
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+>>>>>>> 0e843a8ee52c56839d3188fe2d9aff95e3d9df98

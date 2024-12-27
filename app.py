@@ -7,11 +7,11 @@ import sounddevice as sd
 import soundfile as sf
 import numpy as np
 import wave
+import librosa
 from datetime import datetime
 from werkzeug.utils import secure_filename
 from PyPDF2 import PdfReader
-from openai import OpenAI
-import librosa
+from dotenv import load_dotenv
 from scipy.io import wavfile
 from sklearn.preprocessing import StandardScaler
 import io
@@ -21,7 +21,6 @@ from flask_cors import CORS
 
 # Initialize Flask app
 app = Flask(__name__)
-CORS(app)
 
 # Configure upload folder
 UPLOAD_FOLDER = 'uploads'
@@ -47,7 +46,7 @@ is_training = False
 TRAINING_DURATION = 10  # seconds for voice training
 
 # Initialize the OpenAI client
-client = OpenAI(api_key='')  # Replace with your API key
+client = OpenAI(api_key='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')  # Replace with your API key
 
 # Global variables for document storage
 document_context = []
@@ -437,52 +436,116 @@ def audio_callback(indata, frames, time, status):
 
 def get_ai_response(transcription):
     try:
-        # Prepare document context string
-        context_docs = ""
-        for doc in document_context:
-            context_docs += f"\nDocument: {doc['source']}\nContent: {doc['content']}\n"
-        
         print(f"Generating AI response for: {transcription}")
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo-16k",  # Using 16k model for longer context
-            messages=[
-                {
-                    "role": "system",
-                    "content": f"""You are Alex, a senior SaaS solutions consultant. You specialize in helping clients find the right solutions to their business challenges. When responding:
+        
+        # Base system prompt with structured guidance
+        system_prompt = """You are Alex, a senior SaaS solutions consultant with expertise in helping businesses optimize their operations through software solutions. You are authorized to discuss only the following domains:
 
-1. ALWAYS stay focused on the client's specific question
-2. If you don't have relevant information in the reference documents, say: "Let me address your specific question about [topic]..." and provide general best practices
-3. If you have relevant information in the reference documents, say: "Based on our solution capabilities..." and reference specific features
+Authorized Discussion Areas:
+1. Business process optimization through our SaaS solutions
+2. Implementation strategies for our documented features
+3. Integration capabilities within our ecosystem
+4. ROI and business value of our solutions
+5. Best practices for deploying our SaaS tools
 
-Your response structure:
-1. Brief acknowledgment of their specific need
-2. Your proposed solution with clear examples
-3. Quick summary of benefits
-4. Clear next steps
+Core Responsibilities:
+1. Address client questions about business process optimization
+2. When discussing solutions:
+   - For documented features: Say "Based on our solution capabilities..." and reference specific features
+   - For business challenges: Say "Let me address your needs regarding [business area]..." and provide strategic recommendations
+   - For out-of-scope queries: Say "While I specialize in [our solution areas], that specific topic is outside my expertise. Let me focus on how our solutions can help with..."
 
-Remember to:
-- Use natural language ("I understand what you're looking for...")
-- Stay focused on their exact question
-- Only mention features we actually have
-- Be honest about capabilities
-- Keep responses concise and relevant
+Response Format Requirements:
+1. Use clear headings and subheadings with "##" and "###" markdown
+2. Break down complex information into bullet points
+3. Use numbered lists for sequential steps or processes
+4. Include line breaks between sections for readability
+5. Highlight key points using bold text (**)
+6. Structure responses in easily scannable sections
+7. Use concise paragraphs (3-4 lines maximum)
 
-Reference Materials:
-{context_docs}
+Your Response Structure:
+1. Acknowledge business context:
+   ## Understanding Your Needs
+   "I understand your organization is looking to [specific business need]..."
 
-Important: Never suggest solutions or products we don't offer. If unsure, focus on understanding their needs better."""
-                },
-                {"role": "user", "content": transcription}
-            ],
-            max_tokens=500,  # Increased token limit for more detailed responses
-            temperature=0.7
-        )
-        ai_response = response.choices[0].message.content
-        print(f"AI Response generated: {ai_response}")
-        return ai_response
+2. Present solution strategy:
+   ## Recommended Solution
+   - Connect business needs to specific features
+   - Provide implementation examples
+   - Highlight integration possibilities
+
+3. Demonstrate business value:
+   ## Business Impact
+   - Efficiency gains
+   - Cost benefits
+   - Operational improvements
+
+4. Recommend clear next steps:
+   ## Action Plan
+   1. Immediate steps
+   2. Implementation timeline
+   3. Success metrics
+
+Communication Guidelines:
+- Use business-focused language
+- Provide practical, actionable insights
+- Reference relevant case applications
+- Keep responses strategic and value-oriented
+- Only discuss solutions and features documented in our materials
+- Format responses for maximum readability and clarity"""
+
+        # Add any available document context
+        if document_context:
+            context_text = "\n\nAvailable Solutions:\n" + "\n".join(
+                f"- {doc['content']}" for doc in document_context
+            )
+            system_prompt += context_text
+
+        system_prompt += "\n\nExpert Focus: Provide strategic SaaS solutions that align with client's business objectives and operational needs, strictly within our documented capabilities. Always maintain clear structure and formatting in responses for easy reading and comprehension."
+        
+        # Use the new OpenAI client if available
+        try:
+            if 'client' in globals():
+                response = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": system_prompt
+                        },
+                        {"role": "user", "content": transcription}
+                    ],
+                    max_tokens=500,
+                    temperature=0.7
+                )
+                ai_response = response.choices[0].message.content
+            else:
+                # Fallback to old API
+                response = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": system_prompt
+                        },
+                        {"role": "user", "content": transcription}
+                    ],
+                    max_tokens=500,
+                    temperature=0.7
+                )
+                ai_response = response.choices[0].message['content']
+                
+            print(f"AI Response generated: {ai_response}")
+            return ai_response
+            
+        except Exception as api_error:
+            print(f"OpenAI API error: {str(api_error)}")
+            return f"I apologize, but I'm having trouble generating a response right now. Error: {str(api_error)}"
+            
     except Exception as e:
-        print(f"Error generating AI response: {str(e)}")
-        return None
+        print(f"Error in get_ai_response: {str(e)}")
+        return "I apologize, but I'm having trouble processing your request right now."
 
 def process_audio():
     frames = []
@@ -561,37 +624,68 @@ def home():
 
 @app.route('/index')
 def index():
+    """
+    Route for the main transcription page.
+    Initializes audio capture and returns the index template.
+    """
     global is_listening
     try:
-        # Test audio device availability
-        devices = sd.query_devices()
-        input_device = None
-        for device in devices:
-            if device['max_input_channels'] > 0:
-                input_device = device['index']
-                break
-                
-        if input_device is None:
-            return jsonify({'error': 'No microphone found'}), 400
+        # Initialize Whisper model if not already loaded
+        if not hasattr(app, 'whisper_model') or app.whisper_model is None:
+            print("Loading Whisper model...")
+            app.whisper_model = whisper.load_model("base")
+            print("Whisper model loaded successfully")
+
+        # Test audio device availability without blocking
+        try:
+            devices = sd.query_devices()
+            input_device = None
+            for device in devices:
+                if device['max_input_channels'] > 0:
+                    input_device = device['index']
+                    break
             
-        # Start audio capture when navigating to index page
-        is_listening = True
-        start_background_threads()
+            if input_device is not None:
+                # Start background threads only if device is available
+                is_listening = True
+                start_background_threads()
+        except Exception as audio_error:
+            print(f"Audio device initialization warning: {audio_error}")
+            # Continue loading the page even if audio init fails
+            # Client-side will handle microphone permissions
+        
+        # Always return the template - let client handle mic permissions
         return render_template('index.html')
+        
     except Exception as e:
-        return jsonify({'error': f'Error accessing microphone: {str(e)}'}), 400
+        print(f"Error in index route: {e}")
+        # Still return the template, let client-side handle errors
+        return render_template('index.html')
 
 @app.route('/get_transcription')
 def get_transcription():
+    """
+    Route to get the latest transcription from the queue.
+    Returns transcription data if available.
+    """
     try:
+        # Verify Whisper model is loaded
+        if not hasattr(app, 'whisper_model') or app.whisper_model is None:
+            print("Reloading Whisper model...")
+            app.whisper_model = whisper.load_model("base")
+
         if not transcription_queue.empty():
             data = transcription_queue.get_nowait()
             print(f"Sending transcription: {data}")  # Debug log
             return jsonify(data)
-        return jsonify({'success': False})
+        return jsonify({'success': False, 'message': 'No new transcription available'})
     except Exception as e:
         print(f"Error getting transcription: {e}")
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({
+            'success': False, 
+            'error': str(e),
+            'message': 'Error processing transcription request'
+        })
 
 @app.route('/upload', methods=['POST'])
 def upload_files():
@@ -661,20 +755,31 @@ def generate_ai_response():
     try:
         data = request.json
         transcription = data.get('transcription')
+        
         if not transcription:
-            return jsonify({'success': False, 'error': 'No transcription provided'})
+            return jsonify({
+                'success': False, 
+                'error': 'No transcription provided'
+            })
+        
+        # Add debug logging
+        print(f"Received transcription for AI response: {transcription}")
         
         ai_response = get_ai_response(transcription)
         if ai_response:
+            print(f"Sending AI response: {ai_response}")
             return jsonify({
                 'success': True,
                 'response': ai_response
             })
+            
         return jsonify({
             'success': False,
             'error': 'Failed to generate AI response'
         })
+        
     except Exception as e:
+        print(f"Error in generate_ai_response route: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -844,6 +949,17 @@ def clear_document_context():
     document_context = []
     return jsonify({'success': True, 'message': 'Document context cleared'})
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    """
+    Health check endpoint for AWS App Runner and monitoring services.
+    Returns:
+        JSON response with status and timestamp
+    """
+    try:
+        return '', 200
+    except Exception as e:
+       '', 500
+
 if __name__ == '__main__':
-    print("Starting Flask server on http://127.0.0.1:5000")
-    app.run(host='127.0.0.1', port=5000, debug=True)
+    app.run(debug=False, threaded=True)
