@@ -15,6 +15,8 @@ from dotenv import load_dotenv
 from scipy.io import wavfile
 from sklearn.preprocessing import StandardScaler
 import io
+import openai
+from openai import OpenAI
 from scipy.signal import find_peaks
 from scipy import stats
 from flask_cors import CORS
